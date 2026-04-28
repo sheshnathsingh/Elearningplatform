@@ -40,7 +40,12 @@ def create_app():
     # Initialize extensions with the app instance
     db.init_app(app)
     migrate.init_app(app, db)  # Migrate without JWT
-    CORS(app, origins=["*"], supports_credentials=True)
+    
+    # CORS configuration for production
+    cors_origins = os.environ.get('CORS_ORIGINS', '*')
+    if cors_origins != '*':
+        cors_origins = cors_origins.split(',')
+    CORS(app, origins=cors_origins, supports_credentials=True)
 
     # Register Blueprints
     from .auth_api import auth_bp
@@ -66,12 +71,13 @@ def create_app():
         return jsonify({"error": "Internal Server Error"}), 500
 
     # Create database tables (only during initial app setup)
+    # Database connection is optional - server will start even if DB is unavailable
     with app.app_context():
         try:
             db.create_all()
             logger.info("Tables created successfully.")
         except Exception as e:
-            logger.error(f"Error creating tables: {e}")
-            raise e
+            logger.warning(f"Database connection failed: {e}")
+            logger.warning("Server will start without database connection.")
 
     return app
